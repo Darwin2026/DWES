@@ -2,7 +2,6 @@
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
 
-// Conexión a la base de datos
 $host = 'localhost';
 $user = 'darwin';
 $pass = '080119';
@@ -13,71 +12,59 @@ if ($conn->connect_error) {
     die("Conexión fallida: " . $conn->connect_error);
 }
 
-// Validar parámetro ID
 $id = isset($_GET['id']) ? intval($_GET['id']) : 0;
-if ($id <= 0) {
-    die("ID inválido.");
+
+$stmt = $conn->prepare("SELECT * FROM tLibros WHERE id = ?");
+$stmt->bind_param("i", $id);
+$stmt->execute();
+$libro = $stmt->get_result()->fetch_assoc();
+
+if (!$libro) {
+    echo "Libro no encontrado.";
+    exit;
 }
 
-// Obtener datos del libro
-$sqlLibro = "SELECT * FROM tLibros WHERE id = $id";
-$resultLibro = $conn->query($sqlLibro);
-if ($resultLibro->num_rows === 0) {
-    die("Libro no encontrado.");
-}
-$libro = $resultLibro->fetch_assoc();
+echo "<h2>{$libro['nombre']}</h2>";
+echo "<img src='{$libro['url_imagen']}' style='width:200px;height:300px;'><br>";
+echo "<p><strong>Autor:</strong> {$libro['autor']}</p>";
+echo "<p><strong>Año:</strong> {$libro['año_publicacion']}</p>";
 
-// Obtener comentarios
-$sqlComentarios = "SELECT c.comentario, c.fecha, CONCAT(u.nombre, ' ', u.apellidos) AS usuario
-                   FROM tComentarios c
-                   LEFT JOIN tUsuarios u ON c.usuario_id = u.id
-                   WHERE c.libro_id = $id
-                   ORDER BY c.fecha DESC";
-$resultComentarios = $conn->query($sqlComentarios);
-if (!$resultComentarios) {
-    die("Error en la consulta de comentarios: " . $conn->error);
+$sql = "SELECT c.comentario, c.fecha, u.nombre AS usuario
+        FROM tComentarios c
+        JOIN tUsuarios u ON c.usuario_id = u.id
+        WHERE c.libro_id = ?
+        ORDER BY c.fecha DESC";
+$stmt = $conn->prepare($sql);
+$stmt->bind_param("i", $id);
+$stmt->execute();
+$comentarios = $stmt->get_result();
+
+echo "<h3>Comentarios:</h3>";
+if ($comentarios->num_rows > 0) {
+    while ($row = $comentarios->fetch_assoc()) {
+        echo "<div style='border:1px solid #ccc; padding:10px; margin:10px 0;'>";
+        echo "<strong>{$row['usuario']}</strong> ({$row['fecha']}):<br>";
+        echo htmlspecialchars($row['comentario']);
+        echo "</div>";
+    }
+} else {
+    echo "<p>No hay comentarios aún.</p>";
 }
 ?>
 
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Detalle del libro</title>
-    <style>
-        body { font-family: Arial, sans-serif; padding: 20px; }
-        img { width: 200px; height: 200px; object-fit: cover; }
-        .comentario { border-top: 1px solid #ccc; margin-top: 10px; padding-top: 10px; }
-        textarea { width: 100%; }
-    </style>
-</head>
-<body>
+<h3>Añadir comentario</h3>
+<form method="POST" action="comment.php">
+    <input type="hidden" name="libro_id" value="<?php echo $libro_id; ?>">
+    <label>Tu nombre:</label><br>
+    <input type="text" name="nombre" required><br><br>
 
-    <h1><?= htmlspecialchars($libro['nombre']) ?></h1>
-    <img src="<?= htmlspecialchars($libro['url_imagen']) ?>" alt="Imagen del libro">
-    <p><strong>Autor:</strong> <?= htmlspecialchars($libro['autor']) ?></p>
-    <p><strong>Año de publicación:</strong> <?= $libro['año_publicacion'] ?></p>
+    <label>Comentario:</label><br>
+    <textarea name="comentario" rows="4" required></textarea><br><br>
 
-    <h2>Comentarios</h2>
-    <?php if ($resultComentarios->num_rows > 0): ?>
-        <?php while ($comentario = $resultComentarios->fetch_assoc()): ?>
-            <div class="comentario">
-                <p><strong><?= htmlspecialchars($comentario['usuario'] ?? 'Anónimo') ?>:</strong> <?= htmlspecialchars($comentario['comentario']) ?></p>
-                <small><?= $comentario['fecha'] ?></small>
-            </div>
-        <?php endwhile; ?>
-    <?php else: ?>
-        <p>No hay comentarios aún.</p>
-    <?php endif; ?>
+    <button type="submit">Enviar comentario</button>
+</form>
 
-    <h3>Deja un nuevo comentario</h3>
-    <form action="comment.php" method="POST">
-        <textarea name="new_comment" rows="4" placeholder="Escribe tu comentario..."></textarea><br>
-        <input type="hidden" name="libro_id" value="<?= $id ?>">
-        <input type="submit" value="Comentar">
-    </form>
 
-</body>
-</html>
-
-<?php $conn->close(); ?>
+<?php
+$conn->close();
+?>
