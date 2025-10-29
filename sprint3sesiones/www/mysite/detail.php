@@ -1,60 +1,77 @@
 <?php
-ini_set('display_errors', 1);
+declare(strict_types=1);
+
+ini_set('display_errors', '1');  // En prod: '0'
 error_reporting(E_ALL);
 
-$host = 'localhost';
-$user = 'darwin';
-$pass = '080119';
+// --- Config DB ---
+$host   = 'localhost';
+$user   = 'darwin';
+$pass   = '1234';
 $dbname = 'mysitedb';
+$dsn    = "mysql:host=$host;dbname=$dbname;charset=utf8mb4";
 
-$conn = new mysqli($host, $user, $pass, $dbname);
-if ($conn->connect_error) {
-    die("Conexión fallida: " . $conn->connect_error);
+// --- Conexión PDO ---
+try {
+    $pdo = new PDO($dsn, $user, $pass, [
+        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC
+    ]);
+} catch (PDOException $e) {
+    http_response_code(500);
+    exit('Error al conectar con la base de datos.');
 }
 
-$id = isset($_GET['id']) ? intval($_GET['id']) : 0;
+// --- Validar id ---
+$id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+if ($id === null || $id === false) { http_response_code(400); exit('ID inválido.'); }
 
-$stmt = $conn->prepare("SELECT * FROM tLibros WHERE id = ?");
-$stmt->bind_param("i", $id);
-$stmt->execute();
-$libro = $stmt->get_result()->fetch_assoc();
+// --- Libro ---
+$stmt = $pdo->prepare('SELECT id, nombre, autor, `año_publicacion`, url_imagen FROM tLibros WHERE id = :id');
+$stmt->execute([':id' => $id]);
+$libro = $stmt->fetch();
+if (!$libro) { exit('Libro no encontrado.'); }
 
-if (!$libro) {
-    echo "Libro no encontrado.";
-    exit;
-}
+// --- Render libro (salida escapada) ---
+$nombre = htmlspecialchars($libro['nombre'] ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+$autor  = htmlspecialchars($libro['autor'] ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+$anio   = htmlspecialchars((string)($libro['año_publicacion'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+$imagen = htmlspecialchars($libro['url_imagen'] ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 
-echo "<h2>{$libro['nombre']}</h2>";
-echo "<img src='{$libro['url_imagen']}' style='width:200px;height:300px;'><br>";
-echo "<p><strong>Autor:</strong> {$libro['autor']}</p>";
-echo "<p><strong>Año:</strong> {$libro['año_publicacion']}</p>";
+echo "<h2>{$nombre}</h2>";
+if ($imagen !== '') echo "<img src='{$imagen}' style='width:200px;height:300px;'><br>";
+echo "<p><strong>Autor:</strong> {$autor}</p>";
+echo "<p><strong>Año:</strong> {$anio}</p>";
 
-$sql = "SELECT c.comentario, c.fecha, u.nombre AS usuario
-        FROM tComentarios c
-        JOIN tUsuarios u ON c.usuario_id = u.id
-        WHERE c.libro_id = ?
-        ORDER BY c.fecha DESC";
-$stmt = $conn->prepare($sql);
-$stmt->bind_param("i", $id);
-$stmt->execute();
-$comentarios = $stmt->get_result();
+// --- Comentarios + usuario (JOIN con tUsuarios) ---
+$csql = "SELECT c.comentario, c.fecha, u.nombre, u.apellidos
+         FROM tComentarios c
+         JOIN tUsuarios u ON c.usuario_id = u.id
+         WHERE c.libro_id = :id
+         ORDER BY c.fecha DESC";
+$cst = $pdo->prepare($csql);
+$cst->execute([':id' => $id]);
+$comentarios = $cst->fetchAll();
 
 echo "<h3>Comentarios:</h3>";
-if ($comentarios->num_rows > 0) {
-    while ($row = $comentarios->fetch_assoc()) {
+if ($comentarios) {
+    foreach ($comentarios as $row) {
+        $usuario = trim(($row['nombre'] ?? '') . ' ' . ($row['apellidos'] ?? ''));
+        $usuario = htmlspecialchars($usuario, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $fecha   = htmlspecialchars((string)($row['fecha'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $texto   = htmlspecialchars($row['comentario'] ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+
         echo "<div style='border:1px solid #ccc; padding:10px; margin:10px 0;'>";
-        echo "<strong>{$row['usuario']}</strong> ({$row['fecha']}):<br>";
-        echo htmlspecialchars($row['comentario']);
+        echo "<strong>{$usuario}</strong>" . ($fecha ? " ({$fecha})" : "") . ":<br>{$texto}";
         echo "</div>";
     }
 } else {
     echo "<p>No hay comentarios aún.</p>";
 }
 ?>
-
 <h3>Añadir comentario</h3>
 <form method="POST" action="comment.php">
-    <input type="hidden" name="libro_id" value="<?php echo $libro_id; ?>">
+    <input type="hidden" name="libro_id" value="<?php echo htmlspecialchars((string)$id, ENT_QUOTES, 'UTF-8'); ?>">
     <label>Tu nombre:</label><br>
     <input type="text" name="nombre" required><br><br>
 
@@ -63,8 +80,3 @@ if ($comentarios->num_rows > 0) {
 
     <button type="submit">Enviar comentario</button>
 </form>
-
-
-<?php
-$conn->close();
-?>
