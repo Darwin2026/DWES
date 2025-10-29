@@ -47,6 +47,15 @@ $autor  = htmlspecialchars($libro['autor'] ?? '', ENT_QUOTES | ENT_SUBSTITUTE, '
 $anio   = htmlspecialchars((string)($libro['año_publicacion'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 $imagen = htmlspecialchars($libro['url_imagen'] ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 
+if (!empty($_SESSION['user'])) {
+  $nombreFull = htmlspecialchars($_SESSION['user']['nombre'].' '.$_SESSION['user']['apellidos'], ENT_QUOTES, 'UTF-8');
+  echo "<div style='background:#f6f6f6;border:1px solid #ddd;padding:8px;border-radius:6px;margin:8px 0'>
+          Logueado como {$nombreFull} · <a href=\"/logout.php\">Salir</a>
+        </div>";
+} else {
+  echo '<div style="margin:8px 0"><a href="/login.html">Iniciar sesión</a> · <a href="/register.html">Registrarme</a></div>';
+}
+
 // --- Mostrar información del libro ---
 echo "<h2>{$nombre}</h2>";
 if ($imagen !== '') {
