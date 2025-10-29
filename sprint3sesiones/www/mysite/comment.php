@@ -2,7 +2,8 @@
 declare(strict_types=1);
 
 ini_set('display_errors', '1');  // En prod: '0'
-error_reporting(E_ALL);
+error_reporting(EALL);
+session_start();
 
 // --- Config DB ---
 $host   = 'localhost';
@@ -22,12 +23,18 @@ try {
     exit('Error al conectar con la base de datos.');
 }
 
-// --- Entradas ---
+// --- Entradas obligatorias ---
 $libro_id   = filter_input(INPUT_POST, 'libro_id', FILTER_VALIDATE_INT);
-$nombre     = trim((string)($_POST['nombre'] ?? ''));
 $comentario = trim((string)($_POST['comentario'] ?? ''));
 
-if (!$libro_id || $nombre === '' || $comentario === '') {
+// ¿Hay usuario logueado?
+$loggedUserId = isset($_SESSION['user']['id']) ? (int)$_SESSION['user']['id'] : 0;
+
+// Si no hay sesión, seguimos pidiendo 'nombre' como antes
+$nombre = $loggedUserId ? '' : trim((string)($_POST['nombre'] ?? ''));
+
+// Validaciones básicas
+if (!$libro_id || $comentario === '' || (!$loggedUserId && $nombre === '')) {
     http_response_code(400);
     exit('⚠️ Datos incompletos.');
 }
@@ -35,30 +42,36 @@ if (!$libro_id || $nombre === '' || $comentario === '') {
 try {
     $pdo->beginTransaction();
 
-    // 1) Buscar usuario por nombre (si no existe, crearlo con valores mínimos)
-    $selU = $pdo->prepare('SELECT id FROM tUsuarios WHERE nombre = :n LIMIT 1');
-    $selU->execute([':n' => $nombre]);
-    $u = $selU->fetch();
-
-    if ($u) {
-        $usuario_id = (int)$u['id'];
+    if ($loggedUserId) {
+        // Caso A: Usuario logueado -> usar su id directamente
+        $usuario_id = $loggedUserId;
     } else {
-        $apellidos = '';
-        $email     = null; // Cambia a '' si tu columna es NOT NULL
-        $pwdHash   = password_hash(bin2hex(random_bytes(8)), PASSWORD_DEFAULT);
+        // Caso B: Sin sesión -> buscar/crear por nombre (como antes)
+        $selU = $pdo->prepare('SELECT id FROM tUsuarios WHERE nombre = :n LIMIT 1');
+        $selU->execute([':n' => $nombre]);
+        $u = $selU->fetch();
 
-        $insU = $pdo->prepare('INSERT INTO tUsuarios (nombre, apellidos, email, contraseña)
-                               VALUES (:n, :a, :e, :p)');
-        $insU->execute([
-            ':n' => $nombre,
-            ':a' => $apellidos,
-            ':e' => $email,
-            ':p' => $pwdHash
-        ]);
-        $usuario_id = (int)$pdo->lastInsertId();
+        if ($u) {
+            $usuario_id = (int)$u['id'];
+        } else {
+            // Crear usuario mínimo (apellidos vacío, email NULL, contraseña hash aleatorio)
+            $apellidos = '';
+            $email     = null; // cambia a '' si tu columna es NOT NULL
+            $pwdHash   = password_hash(bin2hex(random_bytes(8)), PASSWORD_DEFAULT);
+
+            $insU = $pdo->prepare('INSERT INTO tUsuarios (nombre, apellidos, email, contraseña)
+                                   VALUES (:n, :a, :e, :p)');
+            $insU->execute([
+                ':n' => $nombre,
+                ':a' => $apellidos,
+                ':e' => $email,
+                ':p' => $pwdHash
+            ]);
+            $usuario_id = (int)$pdo->lastInsertId();
+        }
     }
 
-    // 2) Insertar comentario
+    // Insertar comentario con usuario_id correcto
     $insC = $pdo->prepare('INSERT INTO tComentarios (comentario, usuario_id, libro_id, fecha)
                            VALUES (:c, :uid, :lid, NOW())');
     $insC->execute([

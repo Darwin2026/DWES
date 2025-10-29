@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 ini_set('display_errors', '1');  // En prod: '0'
 error_reporting(E_ALL);
+session_start(); // ✅ necesario para saber si hay usuario logueado
 
 // --- Config DB ---
 $host   = 'localhost';
@@ -24,26 +25,37 @@ try {
 
 // --- Validar id ---
 $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
-if ($id === null || $id === false) { http_response_code(400); exit('ID inválido.'); }
+if ($id === null || $id === false) { 
+    http_response_code(400); 
+    exit('ID inválido.'); 
+}
 
-// --- Libro ---
-$stmt = $pdo->prepare('SELECT id, nombre, autor, `año_publicacion`, url_imagen FROM tLibros WHERE id = :id');
+// --- Obtener información del libro ---
+$stmt = $pdo->prepare('SELECT id, nombre, autor, `año_publicacion`, url_imagen 
+                       FROM tLibros 
+                       WHERE id = :id');
 $stmt->execute([':id' => $id]);
 $libro = $stmt->fetch();
-if (!$libro) { exit('Libro no encontrado.'); }
 
-// --- Render libro (salida escapada) ---
+if (!$libro) { 
+    exit('Libro no encontrado.'); 
+}
+
+// --- Escapar valores antes de mostrar ---
 $nombre = htmlspecialchars($libro['nombre'] ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 $autor  = htmlspecialchars($libro['autor'] ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 $anio   = htmlspecialchars((string)($libro['año_publicacion'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 $imagen = htmlspecialchars($libro['url_imagen'] ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 
+// --- Mostrar información del libro ---
 echo "<h2>{$nombre}</h2>";
-if ($imagen !== '') echo "<img src='{$imagen}' style='width:200px;height:300px;'><br>";
+if ($imagen !== '') {
+    echo "<img src='{$imagen}' style='width:200px;height:300px;'><br>";
+}
 echo "<p><strong>Autor:</strong> {$autor}</p>";
 echo "<p><strong>Año:</strong> {$anio}</p>";
 
-// --- Comentarios + usuario (JOIN con tUsuarios) ---
+// --- Comentarios (JOIN con tUsuarios) ---
 $csql = "SELECT c.comentario, c.fecha, u.nombre, u.apellidos
          FROM tComentarios c
          JOIN tUsuarios u ON c.usuario_id = u.id
@@ -53,6 +65,7 @@ $cst = $pdo->prepare($csql);
 $cst->execute([':id' => $id]);
 $comentarios = $cst->fetchAll();
 
+// --- Mostrar comentarios ---
 echo "<h3>Comentarios:</h3>";
 if ($comentarios) {
     foreach ($comentarios as $row) {
@@ -69,11 +82,22 @@ if ($comentarios) {
     echo "<p>No hay comentarios aún.</p>";
 }
 ?>
+
+<!-- ✅ Formulario dinámico según si hay sesión iniciada -->
+<?php $isLogged = !empty($_SESSION['user']); ?>
 <h3>Añadir comentario</h3>
 <form method="POST" action="comment.php">
-    <input type="hidden" name="libro_id" value="<?php echo htmlspecialchars((string)$id, ENT_QUOTES, 'UTF-8'); ?>">
-    <label>Tu nombre:</label><br>
-    <input type="text" name="nombre" required><br><br>
+    <input type="hidden" name="libro_id" 
+           value="<?php echo htmlspecialchars((string)$id, ENT_QUOTES, 'UTF-8'); ?>">
+
+    <?php if (!$isLogged): ?>
+      <label>Tu nombre:</label><br>
+      <input type="text" name="nombre" required><br><br>
+    <?php else: ?>
+      <p>Publicarás como <strong>
+        <?php echo htmlspecialchars($_SESSION['user']['nombre'].' '.$_SESSION['user']['apellidos'], ENT_QUOTES, 'UTF-8'); ?>
+      </strong></p>
+    <?php endif; ?>
 
     <label>Comentario:</label><br>
     <textarea name="comentario" rows="4" required></textarea><br><br>
