@@ -50,7 +50,9 @@ $imagen = htmlspecialchars($libro['url_imagen'] ?? '', ENT_QUOTES | ENT_SUBSTITU
 if (!empty($_SESSION['user'])) {
   $nombreFull = htmlspecialchars($_SESSION['user']['nombre'].' '.$_SESSION['user']['apellidos'], ENT_QUOTES, 'UTF-8');
   echo "<div style='background:#f6f6f6;border:1px solid #ddd;padding:8px;border-radius:6px;margin:8px 0'>
-          Logueado como {$nombreFull} · <a href=\"/logout.php\">Salir</a>
+          Logueado como {$nombreFull} · 
+          <a href=\"/change_password.html\">Cambiar contraseña</a> · 
+            <a href=\"/logout.php\">Salir</a>
         </div>";
 } else {
   echo '<div style="margin:8px 0"><a href="/login.html">Iniciar sesión</a> · <a href="/register.html">Registrarme</a></div>';

@@ -40,21 +40,72 @@ function h(?string $s): string {
   <title>Biblioteca · Sprint 3</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    :root { --bg:#ffffff; --ink:#222; --muted:#666; --border:#ddd; }
+      --bg:#ffffff; --ink:#222; --muted:#666; --border:#ddd;
+      --hover-shadow:0 8px 18px rgba(0,0,0,0.15);
+    }
     *{box-sizing:border-box}
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);margin:0;padding:16px}
-    header{max-width:1080px;margin:0 auto 16px auto;display:flex;gap:12px;align-items:center;justify-content:space-between}
+    body{
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      background:var(--bg);color:var(--ink);
+      margin:0;padding:16px;
+    }
+    header{
+      max-width:1080px;margin:0 auto 16px auto;
+      display:flex;gap:12px;align-items:center;justify-content:space-between;
+    }
     .brand{font-weight:700;font-size:20px}
-    .userbar{font-size:14px;background:#f7f7f7;border:1px solid var(--border);padding:8px 12px;border-radius:10px}
+    .userbar{
+      font-size:14px;background:#f7f7f7;
+      border:1px solid var(--border);
+      padding:8px 12px;border-radius:10px
+    }
     .userbar a{margin-left:8px}
     .actions a{margin-right:10px}
-    .grid{max-width:1080px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
-    .card{border:1px solid var(--border);border-radius:12px;padding:12px;text-align:center;box-shadow:2px 2px 6px rgba(0,0,0,0.06)}
-    .card img{width:160px;height:210px;object-fit:cover;border-radius:6px;margin:8px 0}
+    .grid{
+      max-width:1080px;margin:0 auto;
+      display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));
+      gap:14px;
+    }
+    .card{
+      border:1px solid var(--border);
+      border-radius:12px;
+      padding:12px;text-align:center;
+      box-shadow:2px 2px 6px rgba(0,0,0,0.06);
+      transition:all .35s ease;       /* transición suave */
+      opacity:0;                      /* para fade-in */
+      transform:translateY(15px);     /* para desplazamiento inicial */
+      animation:appear .6s ease forwards;
+    }
+    @keyframes appear {
+      to {opacity:1;transform:translateY(0);}
+    }
+    .card:hover{
+      transform:scale(1.05) translateY(-4px); /* efecto zoom + elevación */
+      box-shadow:var(--hover-shadow);
+    }
+    .card img{
+      width:160px;height:210px;
+      object-fit:cover;border-radius:6px;margin:8px 0;
+      transition:transform .3s ease;
+    }
+    .card:hover img{transform:scale(1.08);} /* zoom a la imagen */
     .card h3{margin:6px 0 4px;font-size:18px}
     .card p{margin:2px 0;color:var(--muted);font-size:14px}
-    .card a.btn{display:inline-block;margin-top:8px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;text-decoration:none}
-    footer{max-width:1080px;margin:20px auto 0 auto;font-size:13px;color:#888}
+    .card a.btn{
+      display:inline-block;margin-top:8px;padding:8px 10px;
+      border:1px solid var(--border);border-radius:8px;text-decoration:none;
+      transition:background .3s ease,color .3s ease;
+    }
+    .card a.btn:hover{
+      background:#222;color:#fff;border-color:#222;
+    }
+    footer{
+      max-width:1080px;margin:20px auto 0 auto;
+      font-size:13px;color:#888;text-align:center;
+      opacity:0;animation:fadeFooter 1s ease 0.3s forwards;
+    }
+    @keyframes fadeFooter{
+      to{opacity:1;}
   </style>
 </head>
 <body>
@@ -64,7 +115,8 @@ function h(?string $s): string {
       <?php if (!empty($_SESSION['user'])): ?>
         <span class="userbar">
           Hola, <strong><?= h($_SESSION['user']['nombre'].' '.$_SESSION['user']['apellidos']) ?></strong>
-          <a href="/logout.php">Salir</a>
+            <a href="/change_password.html">Cambiar contraseña</a>
+            <a href="/logout.php">Salir</a>
         </span>
       <?php else: ?>
         <span class="userbar">
