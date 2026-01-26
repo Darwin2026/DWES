@@ -1,4 +1,5 @@
 from django.core.serializers import serialize
+from django.template.defaulttags import querystring
 from django.views.decorators.http import require_GET
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -7,6 +8,19 @@ from .models import Paciente
 from .serializers import PacienteSerializer
 from .serializers import PacienteSerializer
 
+#nuevos ViewSet
+
+from rest_framework import viewsets
+from .models import Paciente, Receta
+from .serializers import PacienteSerializer, RecetaSerializer
+
+class PacienteViewSet(viewsets.ModelViewSet):
+    queryset = Paciente.objects.all()
+    serializer_class = PacienteSerializer
+
+class RecetaViewSet(viewsets.ModelViewSet):
+    queryset = Receta.objects.all()
+    serializer_class = RecetaSerializer
 
 class PacienteListAPIView(APIView):
     def get(self, request):
